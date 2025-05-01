@@ -1,14 +1,17 @@
 steps:
-  # Step 1: Create Artifact Registry if not exists
+  # Step 1: Check if Artifact Registry exists and create if not
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: bash
     args:
       - '-c'
       - |
-        # Check if the Artifact Registry exists
+        # Check if the Artifact Registry repository exists
         if ! gcloud artifacts repositories describe vamsi-artifact-repo --location=asia-east1 --project=enhub-cloud-interns; then
           echo "Artifact Registry doesn't exist. Creating it now."
-          gcloud artifacts repositories create vamsi-artifact-repo --repository-format=docker --location=asia-east1 --project=enhub-cloud-interns
+          gcloud artifacts repositories create vamsi-artifact-repo \
+            --repository-format=docker \
+            --location=asia-east1 \
+            --project=enhub-cloud-interns
         else
           echo "Artifact Registry already exists."
         fi
@@ -16,15 +19,10 @@ steps:
   # Step 2: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest', '.']
-    # Ensure Docker build step is successful
-    id: 'docker-build'
-    waitFor: ['-']
 
   # Step 3: Push Docker image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
-    id: 'docker-push'
-    waitFor: ['docker-build']
 
   # Step 4: Create or update secret in Secret Manager
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -38,8 +36,6 @@ steps:
         else
           gcloud secrets create my-app-secret --data-file=secret.json --replication-policy=automatic --project=enhub-cloud-interns
         fi
-    id: 'secret-manager'
-    waitFor: ['docker-push']
 
 images:
   - asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
