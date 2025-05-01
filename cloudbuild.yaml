@@ -22,17 +22,29 @@ steps:
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
   # Step 4: Create the VM
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - 'compute'
-      - 'instances'
-      - 'create'
-      - 'my-vm-instance'
-      - '--image-family=debian-11'
-      - '--image-project=debian-cloud'
-      - '--zone=asia-east1-b'
-      - '--machine-type=e2-medium'
-      - '--tags=http-server,https-server'
+  - - name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+    - '-c'
+    - |
+      INSTANCE_NAME="my-vm-instance"
+      ZONE="asia-east1-b"
+
+      echo "Checking if VM '$INSTANCE_NAME' exists..."
+      if gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --project=enhub-cloud-interns &>/dev/null; then
+        echo "VM '$INSTANCE_NAME' already exists. Skipping creation."
+      else
+        echo "Creating VM '$INSTANCE_NAME'..."
+        gcloud compute instances create $INSTANCE_NAME \
+          --zone=$ZONE \
+          --machine-type=e2-micro \
+          --image-family=debian-11 \
+          --image-project=debian-cloud \
+          --boot-disk-size=10GB \
+          --tags=http-server,https-server \
+          --project=enhub-cloud-interns
+      fi
+
 
   # Step 5: Fetch the secret key only if the application is running
   - name: 'gcr.io/cloud-builders/gcloud'
