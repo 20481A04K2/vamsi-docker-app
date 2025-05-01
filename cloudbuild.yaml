@@ -52,40 +52,39 @@ steps:
       - --service-account=1064351983714-compute@developer.gserviceaccount.com
       - --project=enhub-cloud-interns
 
-  # Step 6: Install Docker on VM
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - compute
-      - ssh
-      - my-vm-instance
-      - --zone=asia-east1-b
-      - --project=enhub-cloud-interns
-      - --command
-      - |
-        sudo apt-get update && \
-        sudo apt-get install -y docker.io && \
-        sudo systemctl start docker
-
-  # Step 7: Pull and run Docker container
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - compute
-      - ssh
-      - my-vm-instance
-      - --zone=asia-east1-b
-      - --project=enhub-cloud-interns
-      - --command
-      - |
-        sudo docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest && \
-        sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-
-  # Step 8: Verify app is running and fetch secret
+  # Step 6: Install Docker on VM (after delay)
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Checking if application is running on port 8080..."
+        echo "Waiting for SSH key to propagate..."
+        sleep 90
+        gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command="\
+          sudo apt-get update && \
+          sudo apt-get install -y docker.io && \
+          sudo systemctl start docker"
+
+  # Step 7: Pull and run Docker container (after delay)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Waiting before pulling and running container..."
+        sleep 90
+        gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command="\
+          sudo docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest && \
+          sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest"
+
+  # Step 8: Verify app is running and fetch secret (after delay)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Waiting before verifying app and fetching secret..."
+        sleep 90
         if gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' &>/dev/null; then
           echo "Application is running. Fetching secret..."
           gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='gcloud secrets versions access latest --secret=my-app-secret --project=enhub-cloud-interns'
