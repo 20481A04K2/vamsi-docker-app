@@ -20,7 +20,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
-  # Step 4: Delete existing VM (optional safety)
+  # Step 4: Delete existing VM (optional)
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -29,7 +29,7 @@ steps:
         echo "Deleting VM if it exists..."
         gcloud compute instances delete my-vm-instance --zone=asia-east1-b --quiet || true
 
-  # Step 5: Create VM with correct scopes
+  # Step 5: Create VM with proper scopes and tags
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
@@ -46,61 +46,55 @@ steps:
       - --service-account=1064351983714-compute@developer.gserviceaccount.com
       - --project=enhub-cloud-interns
 
-  # Step 6: Install Docker on the VM if not already installed
+  # Step 6: Wait for SSH key propagation
   - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
     args:
-      - compute
-      - ssh
-      - my-vm-instance
-      - --zone=asia-east1-b
-      - --project=enhub-cloud-interns
-      - --command='
-          sudo apt-get update -y &&
-          sudo apt-get install -y docker.io &&
-          sudo systemctl enable docker &&
-          sudo systemctl start docker
-        '
+      - '-c'
+      - |
+        echo "Waiting for SSH to be ready..."
+        for i in {1..10}; do
+          if gcloud compute ssh sajja_vamsi@my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='echo SSH ready' &>/dev/null; then
+            echo "SSH is ready!"
+            break
+          else
+            echo "Retry $i: SSH not ready, sleeping..."
+            sleep 10
+          fi
+        done
 
-  # Step 7: Pull, save, and SCP the Docker image to VM
-  - name: 'gcr.io/cloud-builders/gcloud'
+  # Step 7: Save and SCP Docker image to VM
+  - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
         docker save -o my-app.tar asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-        if [ -f my-app.tar ]; then
-          gcloud compute scp my-app.tar sajja_vamsi@my-vm-instance:~ --zone=asia-east1-b
-        else
-          echo "Error: my-app.tar file not found."
-          exit 1
-        fi
+        gcloud compute scp my-app.tar sajja_vamsi@my-vm-instance:~ --zone=asia-east1-b --project=enhub-cloud-interns
 
-  # Step 8: SSH into VM, load the Docker image, and run the container
+  # Step 8: Load and run Docker image on the VM
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
       - ssh
-      - my-vm-instance
+      - sajja_vamsi@my-vm-instance
       - --zone=asia-east1-b
       - --project=enhub-cloud-interns
-      - --command='
-          sudo docker load -i my-app.tar &&
-          sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-        '
+      - --command=sudo docker load -i my-app.tar && sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
 
-  # Step 9: Check if app is running and fetch secret
+  # Step 9: Check app and fetch secret if running
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Checking if application is running on port 8080..."
-        if gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' &>/dev/null; then
-          echo "Application is running. Fetching secret..."
-          gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='gcloud secrets versions access latest --secret=my-app-secret --project=enhub-cloud-interns'
+        echo "Checking app status..."
+        if gcloud compute ssh sajja_vamsi@my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' | grep -q 'Hello'; then
+          echo "App is running! Fetching secret:"
+          gcloud compute ssh sajja_vamsi@my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='gcloud secrets versions access 1 --secret=my-app-secret --project=enhub-cloud-interns'
         else
-          echo "Application is NOT running. Skipping secret fetch."
+          echo "App is not responding. Skipping secret fetch."
         fi
 
 images:
