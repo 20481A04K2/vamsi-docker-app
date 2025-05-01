@@ -1,0 +1,26 @@
+steps:
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest', '.']
+
+  # Step 2: Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
+
+  # Step 3: Create or update secret in Secret Manager
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        echo '{"db_user":"vamsi","db_pass":"securepassword123","api_key":"your-api-key-value"}' > secret.json
+        if gcloud secrets describe my-app-secret --project=enhub-cloud-interns >/dev/null 2>&1; then
+          gcloud secrets versions add my-app-secret --data-file=secret.json --project=enhub-cloud-interns
+        else
+          gcloud secrets create my-app-secret --data-file=secret.json --replication-policy=automatic --project=enhub-cloud-interns
+        fi
+
+# Optional: If you want to run a custom script on your VM using SSH, add another step (you'll need service account with SSH access and permissions).
+
+images:
+  - us-central1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
