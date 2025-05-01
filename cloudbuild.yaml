@@ -26,7 +26,7 @@ steps:
       - push
       - asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
 
-  # Step 4: Delete existing VM if it exists (optional safety)
+  # Step 4: Delete existing VM if it exists
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -64,8 +64,7 @@ steps:
       - |
         sudo apt-get update && \
         sudo apt-get install -y docker.io && \
-        sudo systemctl start docker && \
-        sudo usermod -aG docker '${USER}'
+        sudo systemctl start docker
 
   # Step 7: Pull and run Docker container
   - name: 'gcr.io/cloud-builders/gcloud'
