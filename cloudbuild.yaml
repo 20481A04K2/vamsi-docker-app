@@ -46,7 +46,7 @@ steps:
       - --service-account=1064351983714-compute@developer.gserviceaccount.com
       - --project=enhub-cloud-interns
 
-  # ✅ Step 6: SSH to install Docker manually and reliably
+  # Step 6: SSH to install Docker
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
@@ -65,7 +65,7 @@ steps:
         docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
         docker save -o /workspace/my-app.tar asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
 
-  # Step 8: Copy the tar file to VM
+  # Step 8: Copy tar to VM
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
@@ -75,7 +75,7 @@ steps:
       - --zone=asia-east1-b
       - --project=enhub-cloud-interns
 
-  # Step 9: SSH into VM, load and run Docker image
+  # Step 9: SSH into VM, load and run container
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
@@ -85,7 +85,7 @@ steps:
       - --project=enhub-cloud-interns
       - --command=sudo docker load -i my-app.tar && sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
 
-  # Step 10: Check app status and fetch secret
+  # ✅ Step 10: Check app and fetch secret version 1
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -94,7 +94,7 @@ steps:
         echo "Checking if application is running on port 8080..."
         if gcloud compute ssh sajja_vamsi@my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' &>/dev/null; then
           echo "Application is running. Fetching secret..."
-          gcloud compute ssh sajja_vamsi@my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='gcloud secrets versions access latest --secret=my-app-secret --project=enhub-cloud-interns'
+          gcloud compute ssh sajja_vamsi@my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='gcloud secrets versions access 1 --secret=my-app-secret --project=enhub-cloud-interns'
         else
           echo "Application is NOT running. Skipping secret fetch."
         fi
