@@ -5,7 +5,6 @@ steps:
     args:
       - '-c'
       - |
-        # Check if Artifact Registry repository exists, create if not
         if ! gcloud artifacts repositories describe vamsi-artifact-repo --location=asia-east1 --project=enhub-cloud-interns; then
           echo "Repository doesn't exist. Creating now."
           gcloud artifacts repositories create vamsi-artifact-repo --repository-format=docker --location=asia-east1 --project=enhub-cloud-interns
@@ -21,42 +20,43 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
-  # Step 4: Create the VM
+  # Step 4: Create VM if not already existing
   - name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'bash'
-  args:
-    - '-c'
-    - |
-      INSTANCE_NAME="my-vm-instance"
-      ZONE="asia-east1-b"
-
-      echo "Checking if VM '$INSTANCE_NAME' exists..."
-      if gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --project=enhub-cloud-interns &>/dev/null; then
-        echo "VM '$INSTANCE_NAME' already exists. Skipping creation."
-      else
-        echo "Creating VM '$INSTANCE_NAME'..."
-        gcloud compute instances create $INSTANCE_NAME \
-          --zone=$ZONE \
-          --machine-type=e2-micro \
-          --image-family=debian-11 \
-          --image-project=debian-cloud \
-          --boot-disk-size=10GB \
-          --tags=http-server,https-server \
-          --project=enhub-cloud-interns
-      fi
-
-
-  # Step 5: Fetch the secret key only if the application is running
-  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
     args:
-      - 'compute'
-      - 'ssh'
-      - 'my-vm-instance'
-      - '--zone=asia-east1-b'
-      - '--command="if curl -s http://localhost:8080; then echo Application is running; gcloud secrets access --secret=my-app-secret --version=latest; else echo Application not running; fi"'
-    id: 'Fetch Secret when app is running'
+      - '-c'
+      - |
+        INSTANCE_NAME="my-vm-instance"
+        ZONE="asia-east1-b"
+        echo "Checking if VM '$INSTANCE_NAME' exists..."
+        if gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --project=enhub-cloud-interns &>/dev/null; then
+          echo "VM '$INSTANCE_NAME' already exists. Skipping creation."
+        else
+          echo "Creating VM '$INSTANCE_NAME'..."
+          gcloud compute instances create $INSTANCE_NAME \
+            --zone=$ZONE \
+            --machine-type=e2-micro \
+            --image-family=debian-11 \
+            --image-project=debian-cloud \
+            --boot-disk-size=10GB \
+            --tags=http-server,https-server \
+            --project=enhub-cloud-interns
 
-# Optional: Define the images that will be built
+  # Step 5: SSH into VM, check if app is running, then fetch secret
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'Fetch Secret when app is running'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Checking if application is running on VM..."
+        if gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' &>/dev/null; then
+          echo "Application is running. Fetching secret..."
+          gcloud secrets versions access latest --secret=my-app-secret --project=enhub-cloud-interns
+        else
+          echo "Application not running. Skipping secret fetch."
+        fi
+
 images:
   - 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest'
 
