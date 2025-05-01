@@ -24,3 +24,5 @@ steps:
 # Optional: Define the images that will be built
 images:
   - 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
