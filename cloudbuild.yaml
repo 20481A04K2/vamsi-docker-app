@@ -20,7 +20,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
-  # Step 4: Delete existing VM (optional safety)
+  # Step 4: Delete existing VM
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -29,7 +29,7 @@ steps:
         echo "Deleting VM if it exists..."
         gcloud compute instances delete my-vm-instance --zone=asia-east1-b --quiet || true
 
-  # Step 5: Create VM with correct scopes
+  # Step 5: Create VM
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
@@ -46,38 +46,55 @@ steps:
       - --service-account=1064351983714-compute@developer.gserviceaccount.com
       - --project=enhub-cloud-interns
 
-  # Step 6: Pull, save, and SCP the Docker image to VM
+  # Step 6: Sleep and Install Docker
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
+        echo "Sleeping for 90s to let SSH key propagate..."
+        sleep 90
+        gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command="\
+          sudo apt-get update && \
+          sudo apt-get install -y docker.io && \
+          sudo systemctl start docker"
+
+  # Step 7: Pull, save, and SCP the Docker image to VM
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Preparing Docker image to copy..."
         docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
         docker save -o my-app.tar asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-        gcloud compute scp my-app.tar sajja_vamsi@my-vm-instance:~ --zone=asia-east1-b
+        sleep 30
+        gcloud compute scp my-app.tar my-vm-instance:~ --zone=asia-east1-b --project=enhub-cloud-interns
 
-  # Step 7: SSH into VM, load the Docker image, and run the container
-  - name: 'gcr.io/cloud-builders/gcloud'
-    args:
-      - compute
-      - ssh
-      - my-vm-instance
-      - --zone=asia-east1-b
-      - --project=enhub-cloud-interns
-      - --command='sudo docker load -i my-app.tar && sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest'
-
-  # Step 8: Check if app is running and fetch secret
+  # Step 8: Load image and run container
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Checking if application is running on port 8080..."
+        sleep 30
+        gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command="\
+          sudo docker load -i my-app.tar && \
+          sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest"
+
+  # Step 9: Verify app and fetch secret
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        sleep 30
+        echo "Checking if application is running..."
         if gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' &>/dev/null; then
           echo "Application is running. Fetching secret..."
           gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='gcloud secrets versions access latest --secret=my-app-secret --project=enhub-cloud-interns'
         else
-          echo "Application is NOT running. Skipping secret fetch."
+          echo "Application is NOT running."
         fi
 
 images:
