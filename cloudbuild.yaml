@@ -1,44 +1,26 @@
 steps:
-  # Step 1: Check if Artifact Registry exists and create if not
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: bash
+  # Step 1: Check if the Artifact Registry repository exists, if not create it
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Check if the Artifact Registry repository exists
+        # Check if Artifact Registry repository exists, create if not
         if ! gcloud artifacts repositories describe vamsi-artifact-repo --location=asia-east1 --project=enhub-cloud-interns; then
-          echo "Artifact Registry doesn't exist. Creating it now."
-          gcloud artifacts repositories create vamsi-artifact-repo \
-            --repository-format=docker \
-            --location=asia-east1 \
-            --project=enhub-cloud-interns
+          echo "Repository doesn't exist. Creating now."
+          gcloud artifacts repositories create vamsi-artifact-repo --repository-format=docker --location=asia-east1 --project=enhub-cloud-interns
         else
-          echo "Artifact Registry already exists."
+          echo "Repository already exists."
         fi
 
-  # Step 2: Build Docker image
+  # Step 2: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest', '.']
 
-  # Step 3: Push Docker image to Artifact Registry
+  # Step 3: Push the Docker image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
-  # Step 4: Create or update secret in Secret Manager
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: bash
-    args:
-      - '-c'
-      - |
-        echo '{"db_user":"vamsi","db_pass":"securepassword123","api_key":"your-api-key-value"}' > secret.json
-        if gcloud secrets describe my-app-secret --project=enhub-cloud-interns >/dev/null 2>&1; then
-          gcloud secrets versions add my-app-secret --data-file=secret.json --project=enhub-cloud-interns
-        else
-          gcloud secrets create my-app-secret --data-file=secret.json --replication-policy=automatic --project=enhub-cloud-interns
-        fi
-
+# Optional: Define the images that will be built
 images:
-  - asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-
-options:
-  logging: CLOUD_LOGGING_ONLY
+  - 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest'
