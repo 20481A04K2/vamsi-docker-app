@@ -46,17 +46,7 @@ steps:
       - --service-account=1064351983714-compute@developer.gserviceaccount.com
       - --project=enhub-cloud-interns
 
-  # Step 6: Pull, save, and SCP the Docker image to VM
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-        docker save -o my-app.tar asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
-        gcloud compute scp my-app.tar sajja_vamsi@my-vm-instance:~ --zone=asia-east1-b
-
-  # Step 7: SSH into VM, load the Docker image, and run the container
+  # Step 6: Install Docker on the VM if not already installed
   - name: 'gcr.io/cloud-builders/gcloud'
     args:
       - compute
@@ -64,9 +54,42 @@ steps:
       - my-vm-instance
       - --zone=asia-east1-b
       - --project=enhub-cloud-interns
-      - --command='sudo docker load -i my-app.tar && sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest'
+      - --command='
+          sudo apt-get update -y &&
+          sudo apt-get install -y docker.io &&
+          sudo systemctl enable docker &&
+          sudo systemctl start docker
+        '
 
-  # Step 8: Check if app is running and fetch secret
+  # Step 7: Pull, save, and SCP the Docker image to VM
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
+        docker save -o my-app.tar asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
+        if [ -f my-app.tar ]; then
+          gcloud compute scp my-app.tar sajja_vamsi@my-vm-instance:~ --zone=asia-east1-b
+        else
+          echo "Error: my-app.tar file not found."
+          exit 1
+        fi
+
+  # Step 8: SSH into VM, load the Docker image, and run the container
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - compute
+      - ssh
+      - my-vm-instance
+      - --zone=asia-east1-b
+      - --project=enhub-cloud-interns
+      - --command='
+          sudo docker load -i my-app.tar &&
+          sudo docker run -d -p 8080:8080 asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest
+        '
+
+  # Step 9: Check if app is running and fetch secret
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
