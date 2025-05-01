@@ -1,5 +1,5 @@
 steps:
-  # Step 1: Check if the Artifact Registry repository exists, if not create it
+  # Step 1: Check/create Artifact Registry
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -12,49 +12,47 @@ steps:
           echo "Repository already exists."
         fi
 
-  # Step 2: Build the Docker image
+  # Step 2: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest', '.']
 
-  # Step 3: Push the Docker image to Artifact Registry
+  # Step 3: Push Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
-  # Step 4: Create VM if not already existing
+  # Step 4: Create VM if not exists
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        INSTANCE_NAME="my-vm-instance"
-        ZONE="asia-east1-b"
-        echo "Checking if VM '$INSTANCE_NAME' exists..."
-        if gcloud compute instances describe $INSTANCE_NAME --zone=$ZONE --project=enhub-cloud-interns &>/dev/null; then
-          echo "VM '$INSTANCE_NAME' already exists. Skipping creation."
+        echo "Checking if VM exists..."
+        if gcloud compute instances describe my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns &>/dev/null; then
+          echo "VM already exists."
         else
-          echo "Creating VM '$INSTANCE_NAME'..."
-          gcloud compute instances create $INSTANCE_NAME \
-            --zone=$ZONE \
+          echo "Creating VM..."
+          gcloud compute instances create my-vm-instance \
+            --zone=asia-east1-b \
             --machine-type=e2-micro \
             --image-family=debian-11 \
             --image-project=debian-cloud \
             --boot-disk-size=10GB \
             --tags=http-server,https-server \
             --project=enhub-cloud-interns
+        fi
 
-  # Step 5: SSH into VM, check if app is running, then fetch secret
+  # Step 5: Check if app is running and fetch secret
   - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'Fetch Secret when app is running'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Checking if application is running on VM..."
+        echo "Checking if application is running on port 8080..."
         if gcloud compute ssh my-vm-instance --zone=asia-east1-b --project=enhub-cloud-interns --command='curl -s http://localhost:8080' &>/dev/null; then
           echo "Application is running. Fetching secret..."
           gcloud secrets versions access latest --secret=my-app-secret --project=enhub-cloud-interns
         else
-          echo "Application not running. Skipping secret fetch."
+          echo "Application is NOT running. Skipping secret fetch."
         fi
 
 images:
