@@ -21,8 +21,32 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest']
 
+  # Step 4: Create the VM
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'compute'
+      - 'instances'
+      - 'create'
+      - 'my-vm-instance'
+      - '--image-family=debian-11'
+      - '--image-project=debian-cloud'
+      - '--zone=asia-east1-b'
+      - '--machine-type=e2-medium'
+      - '--tags=http-server,https-server'
+
+  # Step 5: Fetch the secret key only if the application is running
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'compute'
+      - 'ssh'
+      - 'my-vm-instance'
+      - '--zone=asia-east1-b'
+      - '--command="if curl -s http://localhost:8080; then echo Application is running; gcloud secrets access --secret=my-app-secret --version=latest; else echo Application not running; fi"'
+    id: 'Fetch Secret when app is running'
+
 # Optional: Define the images that will be built
 images:
   - 'asia-east1-docker.pkg.dev/enhub-cloud-interns/vamsi-artifact-repo/my-app:latest'
+
 options:
   logging: CLOUD_LOGGING_ONLY
