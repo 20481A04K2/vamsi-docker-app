@@ -59,24 +59,11 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- HARDCODED REAL FIREBASE CONFIGURATION (Reference Only) ---
-        // This configuration is preserved for reference but IS NOT used for initialization 
-        // as it caused the 'auth/admin-restricted-operation' error during sign-in.
-        const REAL_FIREBASE_CONFIG_REFERENCE = {
-            apiKey: "AIzaSyAUM_yNQsBCjzCiQmVDHWCDpdjosVft4tg",
-            authDomain: "crested-polygon-472204-n5.firebaseapp.com",
-            projectId: "crested-polygon-472204-n5",
-            storageBucket: "crested-polygon-472204-n5.firebasestorage.app",
-            messagingSenderId: "613125347481",
-            appId: "1:613125347481:web:f3a5d452533cadd99e8008"
-        };
-
         // --- CONFIGURATION HANDLING (Use Environment Vars) ---
-        // We prioritize __firebase_config and __initial_auth_token provided by the environment 
-        // to bypass the admin restrictions on the hardcoded project.
+        // We prioritize __firebase_config and __initial_auth_token provided by the environment.
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
                                ? JSON.parse(__firebase_config) 
-                               : REAL_FIREBASE_CONFIG_REFERENCE;
+                               : {}; // Fallback empty object if env config is missing
 
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -93,7 +80,6 @@
         const getTokenBtn = document.getElementById('getTokenBtn');
         const callApiBtn = document.getElementById('callApiBtn');
         
-        // API ENDPOINT UPDATED to point to the local Flask route
         const MOCK_API_ENDPOINT = "/api/protected"; 
 
         /**
@@ -155,33 +141,28 @@
                 });
 
 
-                // 3. Handle Authentication with Fallback 
-                let authSuccess = false;
-
+                // 3. Handle Authentication (Attempt Custom Token ONLY)
+                // We SKIP the anonymous sign-in fallback because the project is rejecting it 
+                // with 'auth/admin-restricted-operation'.
+                
                 if (initialAuthToken) {
                     userStatusEl.textContent = 'Attempting sign-in with custom token...';
                     try {
                         // Attempt 1: Custom Token
                         await signInWithCustomToken(auth, initialAuthToken);
-                        authSuccess = true;
+                        showStatus("Signed in with custom token.", 'success');
                     } catch (error) {
                         // Custom Token Failed (e.g., auth/custom-token-mismatch)
-                        console.warn("Custom Token Sign-In Failed. Falling back to Anonymous.", error);
-                        showStatus(`Custom token failed (${error.code}). Attempting anonymous sign-in instead.`, 'info');
-                        // Proceed to Anonymous fallback below
+                        console.error("Custom Token Sign-In Failed:", error);
+                        showStatus(`Authentication failed. Custom token was rejected (${error.code}).`, 'error');
                     }
-                }
-                
-                // Fallback: If custom token failed or wasn't present/failed, sign in anonymously
-                if (!authSuccess) {
-                    userStatusEl.textContent = 'Attempting anonymous sign-in...';
-                    // This attempt should now succeed as we are using the environment's config.
-                    await signInAnonymously(auth);
+                } else {
+                    showStatus("No custom token provided. Awaiting manual sign-in.", 'info');
                 }
 
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
-                showStatus(`FATAL Initialization Error: ${error.message}. Please verify client-side authentication is enabled for your project.`, 'error');
+                showStatus(`FATAL Initialization Error: ${error.message}. Check your console for details.`, 'error');
                 userStatusEl.textContent = `Error: ${error.message}`;
             }
         }
