@@ -59,11 +59,24 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CONFIGURATION HANDLING (Use Environment Vars) ---
-        // We prioritize __firebase_config and __initial_auth_token provided by the environment.
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+        // ====================================================================
+        // !!! IMPORTANT: PASTE YOUR NEW API KEY HERE !!!
+        // The previous key (AIzaSyAUM_yNQsBCjzCiQmVDHWCDpdjosVft4tg) is invalid.
+        // Replace the empty string below with the new, regenerated API Key.
+        // If you haven't regenerated it yet, you must do so first.
+        const NEW_VALID_API_KEY = ""; 
+        // ====================================================================
+
+        // --- CONFIGURATION HANDLING (Use Environment Vars, then Override) ---
+        let firebaseConfig = typeof __firebase_config !== 'undefined' 
                                ? JSON.parse(__firebase_config) 
-                               : {}; // Fallback empty object if env config is missing
+                               : {}; 
+
+        // Override the invalid API key if a new one is provided
+        if (NEW_VALID_API_KEY) {
+            console.log("[Config] Overriding API Key with new provided value.");
+            firebaseConfig.apiKey = NEW_VALID_API_KEY;
+        }
 
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -111,8 +124,17 @@
          * Initializes Firebase and authenticates the user.
          */
         async function initializeFirebase() {
+            // Check if API Key is configured before attempting init
+            if (!firebaseConfig.apiKey) {
+                const errorMessage = "FATAL Error: API Key is missing. Please paste your new, valid API key into the NEW_VALID_API_KEY variable in the script.";
+                console.error(errorMessage);
+                showStatus(errorMessage, 'error');
+                userStatusEl.textContent = "Error: API Key Missing.";
+                return;
+            }
+
             try {
-                // 1. Initialize App with the environment configuration
+                // 1. Initialize App with the (potentially overridden) configuration
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -142,8 +164,6 @@
 
 
                 // 3. Handle Authentication (Attempt Custom Token ONLY)
-                // We SKIP the anonymous sign-in fallback because the project is rejecting it 
-                // with 'auth/admin-restricted-operation'.
                 
                 if (initialAuthToken) {
                     userStatusEl.textContent = 'Attempting sign-in with custom token...';
