@@ -1,17 +1,19 @@
-# Use an official Python base image
+# Use a lightweight Python base image
 FROM python:3.9-slim
 
-# Set working directory inside container
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy code to the container
-COPY . .
+# Install dependencies directly
+# We install 'flask' which is required for app.py
+RUN pip install --no-cache-dir flask
 
-# Install Flask
-RUN pip install flask
+# Copy the Flask application code into the container
+COPY app.py .
 
-# Expose the port
-EXPOSE 8080
+# Expose the port the app runs on
+EXPOSE 5000
 
-# Run the app
+# Set the command to run the application
+# We use 'python app.py' to execute the main block in your script
 CMD ["python", "app.py"]
