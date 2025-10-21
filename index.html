@@ -60,15 +60,31 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Define a dummy config for environments where global variables are not set
+        const DUMMY_FIREBASE_CONFIG = {
+            apiKey: "DUMMY_API_KEY",
+            authDomain: "dummy-project.firebaseapp.com",
+            projectId: "dummy-project",
+            storageBucket: "dummy-project.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef0123456789abcdef"
+        };
+        const DUMMY_APP_ID = 'default-app-id';
+
+
         // --- GLOBAL VARIABLE HANDLING (Crucial to fix the "missing config" error) ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        // Use the environment variable if available, otherwise use the dummy fallback
+        const appId = typeof __app_id !== 'undefined' ? __app_id : DUMMY_APP_ID;
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : DUMMY_FIREBASE_CONFIG; // Fallback added here
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
         let auth;
         let db;
         let currentUser = null;
+        let usingDummyConfig = firebaseConfig === DUMMY_FIREBASE_CONFIG; // Track if we used the fallback
 
         // --- UI ELEMENTS ---
         const statusMessageEl = document.getElementById('status-message');
@@ -78,7 +94,8 @@
         const getTokenBtn = document.getElementById('getTokenBtn');
         const callApiBtn = document.getElementById('callApiBtn');
         
-        const MOCK_API_ENDPOINT = "https://jsonplaceholder.typicode.com/todos/1"; // Using a public mock endpoint for demonstration
+        // API ENDPOINT UPDATED to point to the local Flask route
+        const MOCK_API_ENDPOINT = "/api/protected"; 
 
         /**
          * Utility function to display messages in the status area.
@@ -109,13 +126,8 @@
          * Initializes Firebase and authenticates the user.
          */
         async function initializeFirebase() {
-            if (!firebaseConfig) {
-                const errorMsg = "FATAL ERROR: Firebase configuration (__firebase_config) is missing from the environment.";
-                showStatus(errorMsg, 'error');
-                userStatusEl.textContent = errorMsg;
-                console.error(errorMsg);
-                return;
-            }
+            // NOTE: The check for 'firebaseConfig' is now handled by the fallback above,
+            // preventing the FATAL ERROR in environments without configuration.
 
             try {
                 // 1. Initialize App
@@ -123,6 +135,12 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
                 setLogLevel('debug'); // Enable detailed console logging
+
+                if (usingDummyConfig) {
+                    showStatus("Warning: Using DUMMY Firebase configuration. Real API calls will likely fail backend verification.", 'error');
+                } else {
+                    showStatus("Firebase configuration loaded from environment.", 'info');
+                }
 
                 // 2. Handle Authentication
                 let authPromise;
@@ -142,11 +160,17 @@
                         currentUser = user;
                         const status = `Authenticated. User ID: ${user.uid}`;
                         userStatusEl.textContent = status;
-                        showStatus("Firebase initialized and user signed in successfully.", 'success');
                         
                         // Enable buttons once auth is ready
                         getTokenBtn.disabled = false;
                         callApiBtn.disabled = false;
+
+                        if (usingDummyConfig) {
+                             showStatus("Firebase initialized with DUMMY config and user signed in anonymously. The token generated will not be valid for real Firebase backends.", 'info');
+                        } else {
+                            showStatus("Firebase initialized and user signed in successfully.", 'success');
+                        }
+
                     } else {
                         userStatusEl.textContent = 'Not authenticated.';
                         currentUser = null;
@@ -203,8 +227,11 @@
 
             // 2. Make the API Call
             try {
+                // Explicitly constructing the absolute URL
+                const apiUrl = window.location.origin + MOCK_API_ENDPOINT;
+
                 // The backend (Flask/Express/etc.) would receive this request and verify the token.
-                const response = await fetch(MOCK_API_ENDPOINT, {
+                const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
                         // CRITICAL STEP: Attach the ID Token as a Bearer Token
@@ -218,14 +245,14 @@
                 if (response.ok) {
                     apiResponseDisplayEl.textContent = 
                         `Status: ${response.status} OK\n\n` + 
-                        `Response Body (Mock Data):\n${responseText}`;
-                    showStatus("Mock API call succeeded. Token was attached to the request header.", 'success');
+                        `Response Body:\n${responseText}`;
+                    showStatus("API call succeeded. Token was attached and verified by the backend.", 'success');
                 } else {
-                     // In a real app, a 401 Unauthorized error would likely occur if the token was invalid
+                     // In a real app, a 401 Unauthorized error would occur if the token was invalid
                     apiResponseDisplayEl.textContent = 
                         `Status: ${response.status} Failed\n\n` + 
                         `Response Body: ${responseText}`;
-                    showStatus(`API call failed (Status ${response.status}). Token was attached, but the endpoint did not authorize.`, 'error');
+                    showStatus(`API call failed (Status ${response.status}). The backend likely denied access.`, 'error');
                 }
 
             } catch (error) {
