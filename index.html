@@ -3,272 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Auth & API Test</title>
+    <title>Firebase Auth & OIDC Check</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        /* Style for the API response box */
+        #api-response-box {
+            min-height: 100px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 sm:p-8">
+<body>
 
-    <div id="app" class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-6 sm:p-10">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">Authentication & API Test Utility</h1>
-
-        <div id="status-message" class="p-3 mb-6 rounded-lg font-medium hidden" role="alert"></div>
-
-        <div class="grid md:grid-cols-2 gap-6">
-            <!-- Token Section -->
-            <div class="bg-gray-100 p-5 rounded-lg border border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">1. Get Current ID Token</h2>
-                <button id="getTokenBtn" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition duration-150 shadow-md disabled:bg-blue-300" disabled>
-                    Get ID Token
-                </button>
-                <div class="mt-4">
-                    <h3 class="font-semibold text-gray-600 mb-2">ID Token Preview (For Backend):</h3>
-                    <div id="token-display" class="bg-white p-3 rounded-lg text-sm text-gray-700 break-all min-h-[50px] overflow-auto border border-gray-300">
-                        Token: Click 'Get ID Token'
-                    </div>
-                </div>
+    <div class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-indigo-600">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Authentication & API Test</h1>
+           
+            <div id="status-message" class="p-4 rounded-lg text-center font-medium transition-all duration-300 bg-yellow-100 text-yellow-800">
+                Initializing...
             </div>
 
-            <!-- API Call Section -->
-            <div class="bg-gray-100 p-5 rounded-lg border border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4">2. Call Protected API</h2>
-                <button id="callApiBtn" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition duration-150 shadow-md disabled:bg-indigo-300" disabled>
-                    Call Protected Flask API
+            <div class="mt-6 space-y-4">
+                <button id="get-token-btn" onclick="getAndDisplayToken()" class="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150" disabled>
+                    1. Get Current ID Token
                 </button>
-                <div class="mt-4">
-                    <h3 class="font-semibold text-gray-600 mb-2">API Response:</h3>
-                    <div id="api-response-display" class="bg-white p-3 rounded-lg text-sm text-gray-700 break-all min-h-[50px] overflow-auto border border-gray-300">
-                        Response will appear here.
-                    </div>
-                </div>
+                <button id="call-api-btn" onclick="callProtectedApi()" class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150" disabled>
+                    2. Call Protected Flask API
+                </button>
             </div>
-        </div>
-        
-        <div class="mt-8 pt-6 border-t border-gray-200">
-             <h3 class="text-lg font-semibold text-gray-600 mb-2">Current User Status</h3>
-             <p id="user-status" class="text-gray-700 text-sm">Initializing...</p>
-        </div>
 
+            <div class="mt-8 space-y-3 p-4 bg-gray-50 rounded-lg text-sm break-all">
+                <p class="font-semibold text-gray-700">ID Token Preview (For Backend):</p>
+                <code id="token-preview" class="text-gray-600 text-xs">Token: Click 'Get Token'</code>
+            </div>
+
+            <div class="mt-4">
+                <p class="font-semibold text-gray-700 mb-2">API Response:</p>
+                <pre id="api-response-box" class="bg-gray-100 p-3 rounded-lg text-xs text-gray-800 border"></pre>
+            </div>
+           
+        </div>
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import {
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getIdToken
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ====================================================================
-        // !!! IMPORTANT: PASTE YOUR NEW API KEY HERE !!!
-        // The previous key (AIzaSyAUM_yNQsBCjzCiQmVDHWCDpdjosVft4tg) is invalid.
-        // Replace the empty string below with the new, regenerated API Key.
-        // If you haven't regenerated it yet, you must do so first.
-        const NEW_VALID_API_KEY = ""; 
-        // ====================================================================
-
-        // --- CONFIGURATION HANDLING (Use Environment Vars, then Override) ---
-        let firebaseConfig = typeof __firebase_config !== 'undefined' 
-                               ? JSON.parse(__firebase_config) 
-                               : {}; 
-
-        // Override the invalid API key if a new one is provided
-        if (NEW_VALID_API_KEY) {
-            console.log("[Config] Overriding API Key with new provided value.");
-            firebaseConfig.apiKey = NEW_VALID_API_KEY;
-        }
-
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+        // Global variables for Firebase services and user data
         let app;
-        let auth;
         let db;
-        let currentUser = null;
+        let auth;
+        let userId;
 
-        // --- UI ELEMENTS ---
-        const statusMessageEl = document.getElementById('status-message');
-        const userStatusEl = document.getElementById('user-status');
-        const tokenDisplayEl = document.getElementById('token-display');
-        const apiResponseDisplayEl = document.getElementById('api-response-display');
-        const getTokenBtn = document.getElementById('getTokenBtn');
-        const callApiBtn = document.getElementById('callApiBtn');
-        
-        const MOCK_API_ENDPOINT = "/api/protected"; 
+        // --- Authentication & Initialization ---
+        window.initFirebaseAndAuth = async function() {
+            console.log("Starting Firebase initialization...");
+           
+            const statusElement = document.getElementById('status-message');
+            statusElement.textContent = 'Connecting to Firebase...';
+            statusElement.className = 'p-4 rounded-lg text-center font-medium transition-all duration-300 bg-yellow-100 text-yellow-800';
+           
+            const getTokenBtn = document.getElementById('get-token-btn');
+            const callApiBtn = document.getElementById('call-api-btn');
+            getTokenBtn.disabled = true;
+            callApiBtn.disabled = true;
 
-        /**
-         * Utility function to display messages in the status area.
-         * @param {string} message 
-         * @param {string} type 'success', 'error', 'info'
-         */
-        function showStatus(message, type = 'info') {
-            statusMessageEl.textContent = message;
-            statusMessageEl.className = 'p-3 mb-6 rounded-lg font-medium';
-            statusMessageEl.classList.remove('hidden');
-
-            switch (type) {
-                case 'success':
-                    statusMessageEl.classList.add('bg-green-100', 'text-green-800');
-                    break;
-                case 'error':
-                    statusMessageEl.classList.add('bg-red-100', 'text-red-800');
-                    break;
-                case 'info':
-                default:
-                    statusMessageEl.classList.add('bg-blue-100', 'text-blue-800');
-                    break;
-            }
-            console.log(`[Status] ${message}`);
-        }
-
-        /**
-         * Initializes Firebase and authenticates the user.
-         */
-        async function initializeFirebase() {
-            // Check if API Key is configured before attempting init
-            if (!firebaseConfig.apiKey) {
-                const errorMessage = "FATAL Error: API Key is missing. Please paste your new, valid API key into the NEW_VALID_API_KEY variable in the script.";
-                console.error(errorMessage);
-                showStatus(errorMessage, 'error');
-                userStatusEl.textContent = "Error: API Key Missing.";
-                return;
+            // NOTE: __firebase_config needs to be defined globally as a JSON string
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+           
+            if (Object.keys(firebaseConfig).length === 0) {
+                 console.error("Firebase config is missing. Cannot initialize.");
+                 statusElement.textContent = 'Error: Firebase configuration missing.';
+                 statusElement.className = 'p-4 rounded-lg text-center font-medium transition-all duration-300 bg-red-100 text-red-800';
+                 return;
             }
 
             try {
-                // 1. Initialize App with the (potentially overridden) configuration
                 app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
                 db = getFirestore(app);
-                setLogLevel('debug'); // Enable detailed console logging
+                auth = getAuth(app);
+                setLogLevel('debug');
 
-                showStatus("Firebase initialized successfully using environment configuration.", 'success');
-
-                // 2. Set up Auth State Listener
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUser = user;
-                        const status = `Authenticated. User ID: ${user.uid}`;
-                        userStatusEl.textContent = status;
-                        
-                        // Enable buttons once auth is ready
-                        getTokenBtn.disabled = false;
-                        callApiBtn.disabled = false;
-                        showStatus("User signed in successfully (Anonymously or via Token).", 'success');
-                    } else {
-                        userStatusEl.textContent = 'Not authenticated.';
-                        currentUser = null;
-                        getTokenBtn.disabled = true;
-                        callApiBtn.disabled = true;
-                        showStatus("User signed out or failed to authenticate.", 'error');
-                    }
-                });
-
-
-                // 3. Handle Authentication (Attempt Custom Token ONLY)
-                
-                if (initialAuthToken) {
-                    userStatusEl.textContent = 'Attempting sign-in with custom token...';
-                    try {
-                        // Attempt 1: Custom Token
-                        await signInWithCustomToken(auth, initialAuthToken);
-                        showStatus("Signed in with custom token.", 'success');
-                    } catch (error) {
-                        // Custom Token Failed (e.g., auth/custom-token-mismatch)
-                        console.error("Custom Token Sign-In Failed:", error);
-                        showStatus(`Authentication failed. Custom token was rejected (${error.code}).`, 'error');
-                    }
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    console.log("Attempting sign-in with custom token...");
+                    await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    showStatus("No custom token provided. Awaiting manual sign-in.", 'info');
+                    console.log("No custom token found, attempting anonymous sign-in...");
+                    await signInAnonymously(auth);
                 }
+               
+                console.log("Authentication attempt completed.");
 
             } catch (error) {
-                console.error("Firebase Initialization Error:", error);
-                showStatus(`FATAL Initialization Error: ${error.message}. Check your console for details.`, 'error');
-                userStatusEl.textContent = `Error: ${error.message}`;
-            }
-        }
-
-        /**
-         * Gets the current Firebase ID Token.
-         */
-        async function getToken() {
-            if (!currentUser) {
-                showStatus("Error: User is not authenticated.", 'error');
-                tokenDisplayEl.textContent = "Error: User is not authenticated.";
-                return;
-            }
-            
-            try {
-                // Force refresh to ensure the token is up-to-date
-                const token = await currentUser.getIdToken(true); 
-                tokenDisplayEl.textContent = token;
-                showStatus("Successfully retrieved REAL Firebase ID Token.", 'success');
-                return token;
-            } catch (error) {
-                console.error("Error getting ID token:", error);
-                showStatus(`Failed to get ID token: ${error.message}`, 'error');
-                tokenDisplayEl.textContent = `Error getting token: ${error.message}`;
-                return null;
-            }
-        }
-
-        /**
-         * Calls a mock protected API using the ID Token in the Authorization header.
-         */
-        async function callProtectedApi() {
-            apiResponseDisplayEl.textContent = "Calling API...";
-            showStatus("Attempting to call protected API endpoint...", 'info');
-            
-            // 1. Get the current ID Token
-            const token = await getToken();
-            if (!token) {
-                apiResponseDisplayEl.textContent = "API call aborted: Could not retrieve ID token.";
+                console.error("FATAL Authentication Error:", error);
+                statusElement.textContent = `Authentication Failed: ${error.message}. Check console for details.`;
+                statusElement.className = 'p-4 rounded-lg text-center font-medium transition-all duration-300 bg-red-100 text-red-800';
                 return;
             }
 
-            // 2. Make the API Call
+            // Auth State Listener
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    statusElement.textContent = 'Authentication successful! Ready to test API.';
+                    statusElement.className = 'p-4 rounded-lg text-center font-medium transition-all duration-300 bg-green-100 text-green-800';
+                    getTokenBtn.disabled = false;
+                    callApiBtn.disabled = false;
+                } else {
+                    userId = null;
+                    statusElement.textContent = 'Not authenticated (User signed out).';
+                    statusElement.className = 'p-4 rounded-lg text-center font-medium transition-all duration-300 bg-red-100 text-red-800';
+                    document.getElementById('token-preview').textContent = "Token: N/A";
+                    getTokenBtn.disabled = true;
+                    callApiBtn.disabled = true;
+                }
+            });
+        }
+       
+        // --- Frontend Functions ---
+       
+        window.getAndDisplayToken = async function() {
+            const tokenPreviewElement = document.getElementById('token-preview');
+            tokenPreviewElement.textContent = "Fetching token...";
+           
             try {
-                // Explicitly constructing the absolute URL
-                const apiUrl = window.location.origin + MOCK_API_ENDPOINT;
+                // Get the Firebase ID Token
+                const token = await getIdToken(auth.currentUser, true);
+                window.idToken = token; // Store globally for API call
+               
+                tokenPreviewElement.textContent = `Token: ${token.substring(0, 60)}...`;
+            } catch (error) {
+                console.error("Error fetching ID Token:", error);
+                tokenPreviewElement.textContent = `Error: ${error.message}`;
+            }
+        }
+       
+        window.callProtectedApi = async function() {
+            const responseBox = document.getElementById('api-response-box');
+            responseBox.textContent = "Calling backend /api/protected...";
 
-                // The backend (Flask/Express/etc.) would receive this request and verify the token.
-                const response = await fetch(apiUrl, {
+            // 1. Get the latest ID Token
+            // Use last fetched token. If 'Get Token' hasn't been clicked, it will be "INVALID_TOKEN".
+            const token = window.idToken || "INVALID_TOKEN"; 
+           
+            // NOTE: The Flask app is corrected below to accept the real token for testing.
+
+            try {
+                // Using relative path 'api/protected' to hit the Flask backend
+                const response = await fetch('api/protected', {
                     method: 'GET',
                     headers: {
-                        // CRITICAL STEP: Attach the ID Token as a Bearer Token
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
                 });
 
-                const responseText = await response.text();
-
-                if (response.ok) {
-                    apiResponseDisplayEl.textContent = 
-                        `Status: ${response.status} OK\n\n` + 
-                        `Response Body:\n${responseText}`;
-                    showStatus("API call succeeded. The token was sent successfully.", 'success');
+                const data = await response.json();
+               
+                // Display result
+                responseBox.textContent = JSON.stringify(data, null, 2);
+                if (!response.ok) {
+                    responseBox.className = 'bg-red-100 p-3 rounded-lg text-xs text-red-800 border';
                 } else {
-                     // In a real app, a 401 Unauthorized error would occur if the token was invalid
-                    apiResponseDisplayEl.textContent = 
-                        `Status: ${response.status} Failed\n\n` + 
-                        `Response Body: ${responseText}`;
-                    showStatus(`API call failed (Status ${response.status}). The token was likely invalid for the backend.`, 'error');
+                    responseBox.className = 'bg-green-100 p-3 rounded-lg text-xs text-green-800 border';
                 }
 
             } catch (error) {
-                console.error("API Call Error:", error);
-                apiResponseDisplayEl.textContent = `Network Error: ${error.message}. (Ensure MOCK_API_ENDPOINT is reachable).`;
-                showStatus(`API call failed due to a network or fetch error: ${error.message}`, 'error');
+                console.error("Network or API Call Error:", error);
+                responseBox.textContent = `Network Error: Could not reach the Flask backend at /api/protected. Check console for details.`;
+                responseBox.className = 'bg-red-100 p-3 rounded-lg text-xs text-red-800 border';
             }
         }
 
-        // --- EVENT LISTENERS ---
-        getTokenBtn.addEventListener('click', getToken);
-        callApiBtn.addEventListener('click', callProtectedApi);
-
-        // --- START APP ---
-        window.onload = initializeFirebase;
-
+        // Start initialization on window load
+        window.onload = initFirebaseAndAuth;
     </script>
 </body>
 </html>
