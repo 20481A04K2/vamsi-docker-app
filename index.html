@@ -21,6 +21,7 @@
 </head>
 <body>
 
+
     <div class="min-h-screen flex flex-col items-center justify-center p-4">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md border-t-4 border-indigo-600">
             <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Authentication & API Test</h1>
@@ -28,6 +29,7 @@
             <div id="status-message" class="p-4 rounded-lg text-center font-medium transition-all duration-300 bg-yellow-100 text-yellow-800">
                 Initializing...
             </div>
+
 
             <div class="mt-6 space-y-4">
                 <button id="get-token-btn" onclick="getAndDisplayToken()" class="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150" disabled>
@@ -38,10 +40,12 @@
                 </button>
             </div>
 
+
             <div class="mt-8 space-y-3 p-4 bg-gray-50 rounded-lg text-sm break-all">
                 <p class="font-semibold text-gray-700">ID Token Preview (For Backend):</p>
                 <code id="token-preview" class="text-gray-600 text-xs">Token: Click 'Get Token'</code>
             </div>
+
 
             <div class="mt-4">
                 <p class="font-semibold text-gray-700 mb-2">API Response:</p>
@@ -51,6 +55,8 @@
         </div>
     </div>
 
+
+    <!-- Firebase Imports -->
     <script type="module">
         import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import {
@@ -62,11 +68,13 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+
         // Global variables for Firebase services and user data
         let app;
         let db;
         let auth;
         let userId;
+
 
         // --- Authentication & Initialization ---
         window.initFirebaseAndAuth = async function() {
@@ -81,7 +89,7 @@
             getTokenBtn.disabled = true;
             callApiBtn.disabled = true;
 
-            // NOTE: __firebase_config needs to be defined globally as a JSON string
+
             const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
            
             if (Object.keys(firebaseConfig).length === 0) {
@@ -91,11 +99,13 @@
                  return;
             }
 
+
             try {
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
                 setLogLevel('debug');
+
 
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     console.log("Attempting sign-in with custom token...");
@@ -107,12 +117,14 @@
                
                 console.log("Authentication attempt completed.");
 
+
             } catch (error) {
                 console.error("FATAL Authentication Error:", error);
                 statusElement.textContent = `Authentication Failed: ${error.message}. Check console for details.`;
                 statusElement.className = 'p-4 rounded-lg text-center font-medium transition-all duration-300 bg-red-100 text-red-800';
                 return;
             }
+
 
             // Auth State Listener
             onAuthStateChanged(auth, (user) => {
@@ -155,14 +167,17 @@
             const responseBox = document.getElementById('api-response-box');
             responseBox.textContent = "Calling backend /api/protected...";
 
+
             // 1. Get the latest ID Token
-            // Use last fetched token. If 'Get Token' hasn't been clicked, it will be "INVALID_TOKEN".
-            const token = window.idToken || "INVALID_TOKEN"; 
+            const token = window.idToken || "INVALID_TOKEN"; // Use last fetched token or an invalid placeholder
            
-            // NOTE: The Flask app is corrected below to accept the real token for testing.
+            // NOTE: The Flask app expects "VALID_ID_TOKEN_FROM_OIDC" to succeed.
+            // Since we're using a real Firebase token here, this call is expected to FAIL (403)
+            // because the Flask app uses a simple string check instead of full Firebase Admin SDK validation.
+
 
             try {
-                // Using relative path 'api/protected' to hit the Flask backend
+                // Using relative path 'api/protected' to avoid the URL parsing error
                 const response = await fetch('api/protected', {
                     method: 'GET',
                     headers: {
@@ -170,6 +185,7 @@
                         'Content-Type': 'application/json'
                     }
                 });
+
 
                 const data = await response.json();
                
@@ -181,15 +197,22 @@
                     responseBox.className = 'bg-green-100 p-3 rounded-lg text-xs text-green-800 border';
                 }
 
+
             } catch (error) {
                 console.error("Network or API Call Error:", error);
+                // Check if the error is due to a failed URL parse or a real network issue
                 responseBox.textContent = `Network Error: Could not reach the Flask backend at /api/protected. Check console for details.`;
                 responseBox.className = 'bg-red-100 p-3 rounded-lg text-xs text-red-800 border';
             }
         }
+
 
         // Start initialization on window load
         window.onload = initFirebaseAndAuth;
     </script>
 </body>
 </html>
+
+
+
+
