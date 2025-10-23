@@ -3,11 +3,11 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 # --- Simplified Gateway/API Endpoints ---
-
+app = Flask(__name__, static_url_path='', static_folder='.')
 @app.route('/')
 def home():
     """Simple health check endpoint."""
-    return "OIDC Test Application is Running!", 200
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/protected', methods=['GET'])
 def protected_resource():
@@ -48,3 +48,4 @@ def protected_resource():
 if __name__ == '__main__':
     # Running on all interfaces (0.0.0.0) for Docker compatibility
     app.run(host='0.0.0.0', port=5000)
+
