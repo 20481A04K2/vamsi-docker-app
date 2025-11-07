@@ -28,5 +28,5 @@ images:
 options:
   logging: CLOUD_LOGGING_ONLY
   pool:
-    name: 'projects/thematic-land-477215-a5/locations/asia-south1/workerPools/wp'
+    name: 'projects/thematic-land-477215-a5/locations/us-central1/workerPools/wp'
   dynamic_substitutions: true
