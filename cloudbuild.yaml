@@ -5,25 +5,25 @@ steps:
     args:
       - '-c'
       - |
-        if ! gcloud artifacts repositories describe vamsi-artifact-repo --location=asia-east1 --project=thematic-land-477215-a5; then
+        if ! gcloud artifacts repositories describe vamsi-artifact-repo --location=us-central1 --project=thematic-land-477215-a5; then
           echo "Repository doesn't exist. Creating now."
-          gcloud artifacts repositories create vamsi-artifact-repo --repository-format=docker --location=asia-east1 --project=thematic-land-477215-a5
+          gcloud artifacts repositories create vamsi-artifact-repo --repository-format=docker --location=us-central1 --project=thematic-land-477215-a5
         else
           echo "Repository already exists."
         fi
 
   # Step 2: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'asia-east1-docker.pkg.dev/thematic-land-477215-a5/vamsi-artifact-repo/my-app:latest', '.']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/thematic-land-477215-a5/vamsi-artifact-repo/my-app:latest', '.']
 
   # Step 3: Push Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia-east1-docker.pkg.dev/thematic-land-477215-a5/vamsi-artifact-repo/my-app:latest']
+    args: ['push', 'us-central1-docker.pkg.dev/thematic-land-477215-a5/vamsi-artifact-repo/my-app:latest']
 
 
 
 images:
-  - 'asia-east1-docker.pkg.dev/thematic-land-477215-a5/vamsi-artifact-repo/my-app:latest'
+  - 'us-central1-docker.pkg.dev/thematic-land-477215-a5/vamsi-artifact-repo/my-app:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
